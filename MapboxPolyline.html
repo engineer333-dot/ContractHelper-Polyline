@@ -7,72 +7,57 @@
     <script>
         const accessToken = "pk.eyJ1IjoiZW5naW5lZXJ0ZWNoIiwiYSI6ImNtNmI3eHJ5czA1ZGwya3ExYmdwb3J4bjMifQ.EDUIm_IM-bCuPJqokqHGOg";
 
-        // Function to encode polyline using Google's polyline algorithm
-        function encodePolyline(points) {
-            let result = '';
-            let prevLat = 0;
-            let prevLng = 0;
-
-            points.forEach(([lat, lng]) => {
-                const latE5 = Math.round(lat * 1e5);
-                const lngE5 = Math.round(lng * 1e5);
-
-                const dLat = latE5 - prevLat;
-                const dLng = lngE5 - prevLng;
-
-                prevLat = latE5;
-                prevLng = lngE5;
-
-                [dLat, dLng].forEach((value) => {
-                    let shifted = value << 1;
-                    if (value < 0) shifted = ~shifted;
-
-                    while (shifted >= 0x20) {
-                        result += String.fromCharCode((0x20 | (shifted & 0x1f)) + 63);
-                        shifted >>= 5;
-                    }
-                    result += String.fromCharCode(shifted + 63);
-                });
-            });
-
-            return result;
+        function getQueryParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const lat1 = parseFloat(urlParams.get('lat1'));
+            const lng1 = parseFloat(urlParams.get('lng1'));
+            const lat2 = parseFloat(urlParams.get('lat2'));
+            const lng2 = parseFloat(urlParams.get('lng2'));
+            if (!lat1 || !lng1 || !lat2 || !lng2) {
+                document.body.innerHTML = "<h1>Error: Invalid or missing query parameters</h1>";
+                return null;
+            }
+            return { lat1, lng1, lat2, lng2 };
         }
 
-        function generateMapURL() {
-            const coord1 = document.getElementById("coord1").value.split(",").map(Number);
-            const coord2 = document.getElementById("coord2").value.split(",").map(Number);
+        async function generateMapURL() {
+            const params = getQueryParams();
+            if (!params) return;
 
-            if (coord1.length !== 2 || coord2.length !== 2 || isNaN(coord1[0]) || isNaN(coord1[1]) || isNaN(coord2[0]) || isNaN(coord2[1])) {
-                alert("Please enter valid coordinates in the format: lat,lng");
+            const { lat1, lng1, lat2, lng2 } = params;
+
+            // Use Mapbox Directions API to calculate the route
+            const directionsURL = `https://api.mapbox.com/directions/v5/mapbox/driving/${lng1},${lat1};${lng2},${lat2}?geometries=polyline&access_token=${accessToken}`;
+            const response = await fetch(directionsURL);
+            if (!response.ok) {
+                document.body.innerHTML = `<h1>Error: Unable to fetch route (${response.status})</h1>`;
                 return;
             }
 
-            const polyline = encodePolyline([coord1, coord2]);
-            const midLat = (coord1[0] + coord2[0]) / 2;
-            const midLng = (coord1[1] + coord2[1]) / 2;
+            const data = await response.json();
+            const polyline = data.routes[0].geometry;
+
+            // Calculate the midpoint for centering the map
+            const midLat = (lat1 + lat2) / 2;
+            const midLng = (lng1 + lng2) / 2;
 
             const zoom = 16; // Adjust zoom level as needed
             const width = 600;
             const height = 600;
 
             const path = `path-5+0000ff(${polyline})`;
-            const pin1 = `pin-s-circle+ff0000(${coord1[1]},${coord1[0]})`;
-            const pin2 = `pin-s-circle+ff0000(${coord2[1]},${coord2[0]})`;
+            const pin1 = `pin-s-circle+ff0000(${lng1},${lat1})`;
+            const pin2 = `pin-s-circle+ff0000(${lng2},${lat2})`;
 
-            const url = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${path},${pin1},${pin2}/${midLng},${midLat},${zoom}/${width}x${height}?access_token=${accessToken}`;
+            const staticMapURL = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${path},${pin1},${pin2}/${midLng},${midLat},${zoom}/${width}x${height}?access_token=${accessToken}`;
 
-            document.getElementById("output").innerText = url;
+            document.body.innerHTML = `<h1>Mapbox URL</h1><p>${staticMapURL}</p>`;
         }
+
+        window.onload = generateMapURL;
     </script>
 </head>
 <body>
-    <h1>Mapbox Polyline Generator</h1>
-    <p>Enter two coordinates (lat,lng) to generate a static map URL:</p>
-    <label for="coord1">Coordinate 1:</label>
-    <input type="text" id="coord1" placeholder="e.g., 37.133033,-80.394603"><br><br>
-    <label for="coord2">Coordinate 2:</label>
-    <input type="text" id="coord2" placeholder="e.g., 37.130846,-80.396098"><br><br>
-    <button onclick="generateMapURL()">Generate Map URL</button>
-    <p id="output" style="margin-top:20px; word-wrap:break-word;"></p>
+    <h1>Generating Mapbox URL...</h1>
 </body>
 </html>
