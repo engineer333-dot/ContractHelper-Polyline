@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapbox URL Generator</title>
+    <script>
+        const accessToken = 'pk.eyJ1IjoiZW5naW5lZXJ0ZWNoIiwiYSI6ImNtNmI3eHJ5czA1ZGwya3ExYmdwb3J4bjMifQ.EDUIm_IM-bCuPJqokqHGOg';
+        const directionsURL = 'https://api.mapbox.com/directions/v5/mapbox/driving/';
+
+        async function getMapboxURL() {
+            const params = new URLSearchParams(window.location.search);
+            const lat1 = parseFloat(params.get('lat1'));
+            const lng1 = parseFloat(params.get('lng1'));
+            const lat2 = parseFloat(params.get('lat2'));
+            const lng2 = parseFloat(params.get('lng2'));
+
+            const points = [[lng1, lat1], [lng2, lat2]];
+            const coords = points.map(p => p.join(',')).join(';');
+
+            const url = `${directionsURL}${coords}?geometries=polyline&access_token=${accessToken}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.routes && data.routes[0]) {
+                    const polyline = data.routes[0].geometry;
+
+                    const midLat = (lat1 + lat2) / 2;
+                    const midLng = (lng1 + lng2) / 2;
+
+                    const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+                    const zoom = distance < 0.1 ? 16 : distance < 1 ? 14 : 12;
+
+                    const staticMapURL = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/path-5+0000ff(${polyline}),pin-s-circle+ff0000(${lng1},${lat1}),pin-s-circle+ff0000(${lng2},${lat2})/${midLng},${midLat},${zoom}/600x600?access_token=${accessToken}`;
+
+                    document.body.innerText = staticMapURL; // This is the response text
+                } else {
+                    throw new Error('No route found.');
+                }
+            } catch (error) {
+                document.body.innerText = 'Error: Unable to generate URL.';
+            }
+        }
+
+        getMapboxURL();
+    </script>
+</head>
+<body>
+</body>
+</html>
