@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapbox Polyline Generator</title>
     <script>
         const accessToken = "pk.eyJ1IjoiZW5naW5lZXJ0ZWNoIiwiYSI6ImNtNmI3eHJ5czA1ZGwya3ExYmdwb3J4bjMifQ.EDUIm_IM-bCuPJqokqHGOg";
 
@@ -13,7 +14,7 @@
             const lat2 = parseFloat(urlParams.get('lat2'));
             const lng2 = parseFloat(urlParams.get('lng2'));
             if (!lat1 || !lng1 || !lat2 || !lng2) {
-                document.body.innerHTML = "<h1>Error: Invalid or missing query parameters</h1>";
+                document.body.innerText = "Error: Invalid or missing query parameters";
                 return null;
             }
             return { lat1, lng1, lat2, lng2 };
@@ -29,7 +30,7 @@
             const directionsURL = `https://api.mapbox.com/directions/v5/mapbox/driving/${lng1},${lat1};${lng2},${lat2}?geometries=polyline&access_token=${accessToken}`;
             const response = await fetch(directionsURL);
             if (!response.ok) {
-                document.body.innerHTML = `<h1>Error: Unable to fetch route (${response.status})</h1>`;
+                document.body.innerText = `Error: Unable to fetch route (${response.status})`;
                 return;
             }
 
@@ -50,13 +51,13 @@
 
             const staticMapURL = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${path},${pin1},${pin2}/${midLng},${midLat},${zoom}/${width}x${height}?access_token=${accessToken}`;
 
-            document.body.innerHTML = `<h1>Mapbox URL</h1><p>${staticMapURL}</p>`;
+            // Output the URL as plain text
+            document.body.innerText = staticMapURL;
         }
 
         window.onload = generateMapURL;
     </script>
 </head>
 <body>
-    <h1>Generating Mapbox URL...</h1>
 </body>
 </html>
