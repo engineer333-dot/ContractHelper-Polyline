@@ -3,49 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapbox URL Generator</title>
+    <title>Mapbox Polyline Generator</title>
     <script>
-        const accessToken = 'pk.eyJ1IjoiZW5naW5lZXJ0ZWNoIiwiYSI6ImNtNmI3eHJ5czA1ZGwya3ExYmdwb3J4bjMifQ.EDUIm_IM-bCuPJqokqHGOg';
-        const directionsURL = 'https://api.mapbox.com/directions/v5/mapbox/driving/';
+        const accessToken = "pk.eyJ1IjoiZW5naW5lZXJ0ZWNoIiwiYSI6ImNtNmI3eHJ5czA1ZGwya3ExYmdwb3J4bjMifQ.EDUIm_IM-bCuPJqokqHGOg";
 
-        async function getMapboxURL() {
-            const params = new URLSearchParams(window.location.search);
-            const lat1 = parseFloat(params.get('lat1'));
-            const lng1 = parseFloat(params.get('lng1'));
-            const lat2 = parseFloat(params.get('lat2'));
-            const lng2 = parseFloat(params.get('lng2'));
+        // Function to encode polyline using Google's polyline algorithm
+        function encodePolyline(points) {
+            let result = '';
+            let prevLat = 0;
+            let prevLng = 0;
 
-            const points = [[lng1, lat1], [lng2, lat2]];
-            const coords = points.map(p => p.join(',')).join(';');
+            points.forEach(([lat, lng]) => {
+                const latE5 = Math.round(lat * 1e5);
+                const lngE5 = Math.round(lng * 1e5);
 
-            const url = `${directionsURL}${coords}?geometries=polyline&access_token=${accessToken}`;
+                const dLat = latE5 - prevLat;
+                const dLng = lngE5 - prevLng;
 
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                if (data.routes && data.routes[0]) {
-                    const polyline = data.routes[0].geometry;
+                prevLat = latE5;
+                prevLng = lngE5;
 
-                    const midLat = (lat1 + lat2) / 2;
-                    const midLng = (lng1 + lng2) / 2;
+                [dLat, dLng].forEach((value) => {
+                    let shifted = value << 1;
+                    if (value < 0) shifted = ~shifted;
 
-                    const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
-                    const zoom = distance < 0.1 ? 16 : distance < 1 ? 14 : 12;
+                    while (shifted >= 0x20) {
+                        result += String.fromCharCode((0x20 | (shifted & 0x1f)) + 63);
+                        shifted >>= 5;
+                    }
+                    result += String.fromCharCode(shifted + 63);
+                });
+            });
 
-                    const staticMapURL = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/path-5+0000ff(${polyline}),pin-s-circle+ff0000(${lng1},${lat1}),pin-s-circle+ff0000(${lng2},${lat2})/${midLng},${midLat},${zoom}/600x600?access_token=${accessToken}`;
-
-                    document.body.innerText = staticMapURL; // This is the response text
-                } else {
-                    throw new Error('No route found.');
-                }
-            } catch (error) {
-                document.body.innerText = 'Error: Unable to generate URL.';
-            }
+            return result;
         }
 
-        getMapboxURL();
+        function generateMapURL() {
+            const coord1 = document.getElementById("coord1").value.split(",").map(Number);
+            const coord2 = document.getElementById("coord2").value.split(",").map(Number);
+
+            if (coord1.length !== 2 || coord2.length !== 2 || isNaN(coord1[0]) || isNaN(coord1[1]) || isNaN(coord2[0]) || isNaN(coord2[1])) {
+                alert("Please enter valid coordinates in the format: lat,lng");
+                return;
+            }
+
+            const polyline = encodePolyline([coord1, coord2]);
+            const midLat = (coord1[0] + coord2[0]) / 2;
+            const midLng = (coord1[1] + coord2[1]) / 2;
+
+            const zoom = 16; // Adjust zoom level as needed
+            const width = 600;
+            const height = 600;
+
+            const path = `path-5+0000ff(${polyline})`;
+            const pin1 = `pin-s-circle+ff0000(${coord1[1]},${coord1[0]})`;
+            const pin2 = `pin-s-circle+ff0000(${coord2[1]},${coord2[0]})`;
+
+            const url = `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${path},${pin1},${pin2}/${midLng},${midLat},${zoom}/${width}x${height}?access_token=${accessToken}`;
+
+            document.getElementById("output").innerText = url;
+        }
     </script>
 </head>
 <body>
+    <h1>Mapbox Polyline Generator</h1>
+    <p>Enter two coordinates (lat,lng) to generate a static map URL:</p>
+    <label for="coord1">Coordinate 1:</label>
+    <input type="text" id="coord1" placeholder="e.g., 37.133033,-80.394603"><br><br>
+    <label for="coord2">Coordinate 2:</label>
+    <input type="text" id="coord2" placeholder="e.g., 37.130846,-80.396098"><br><br>
+    <button onclick="generateMapURL()">Generate Map URL</button>
+    <p id="output" style="margin-top:20px; word-wrap:break-word;"></p>
 </body>
 </html>
